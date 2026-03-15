@@ -15,7 +15,7 @@ class AddProjectPage extends StatefulWidget {
 
 class _AddProjectPageState extends State<AddProjectPage> {
   final titleController = TextEditingController();
-  final contentController = TextEditingController();
+  final descriptionController = TextEditingController();
   String selectedPriority = "Low";
 
   final taskController = TextEditingController();
@@ -25,29 +25,51 @@ class _AddProjectPageState extends State<AddProjectPage> {
   @override
   void initState() {
     super.initState();
+    if (widget.project != null) {
+      titleController.text = widget.project!.title;
+      descriptionController.text = widget.project!.description;
+      selectedPriority = widget.project!.priority == 1
+          ? 'High'
+          : widget.project!.priority == 2
+          ? 'Medium'
+          : 'Low';
+      tempTasks = widget.project!.tasks;
+    }
   }
 
   @override
   void dispose() {
     titleController.dispose();
-    contentController.dispose();
+    descriptionController.dispose();
     super.dispose();
   }
 
   Future<void> onSave(ProjectModel project) async {
-    try {
-      await context.read<ProjectProvider>().addProject(project);
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Project added...')));
-        Navigator.pop(context);
+    if (widget.project != null) {
+      try {
+        await context.read<ProjectProvider>().updateProject(project);
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('Error updating project: $e')));
+        }
       }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text("Error adding project: $e")));
+    } else {
+      try {
+        await context.read<ProjectProvider>().addProject(project);
+        if (mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('Project added...')));
+          Navigator.pop(context);
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text("Error adding project: $e")));
+        }
       }
     }
   }
@@ -100,19 +122,23 @@ class _AddProjectPageState extends State<AddProjectPage> {
       extendBodyBehindAppBar: true,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
-        title: Text('Add project'),
+        elevation: 0,
+        title: widget.project != null
+            ? Text('Update project')
+            : Text('Add project'),
         actions: [
           TextButton(
             onPressed: projectProvider.isLoading
                 ? null
                 : () async {
                     final title = titleController.text.trim();
-                    final description = contentController.text.trim();
+                    final description = descriptionController.text.trim();
                     final cratedBy =
                         FirebaseAuth.instance.currentUser?.displayName ??
                         'User';
                     final createdAt = DateTime.now();
                     final project = ProjectModel(
+                      id: widget.project?.id ?? '',
                       title: firstLetterCapital(title),
                       description: firstLetterCapital(description),
                       priority: selectedPriority == 'High'
@@ -122,7 +148,8 @@ class _AddProjectPageState extends State<AddProjectPage> {
                           : 3,
                       createdBy: cratedBy,
                       createdAt: createdAt,
-                      tasks: tempTasks, status: 3,
+                      tasks: tempTasks,
+                      status: 3,
                     );
 
                     await onSave(project);
@@ -143,12 +170,14 @@ class _AddProjectPageState extends State<AddProjectPage> {
                       controller: titleController,
                       maxLength: 20,
                       decoration: InputDecoration(
+                        label: Text("Project title"),
                         hint: Text("Project title"),
                         border: OutlineInputBorder(
                           borderSide: BorderSide(
                             color: Colors.blue,
                             style: BorderStyle.solid,
                             width: 1,
+                            strokeAlign: BorderSide.strokeAlignInside,
                           ),
                           borderRadius: BorderRadius.circular(10),
                         ),
@@ -156,10 +185,11 @@ class _AddProjectPageState extends State<AddProjectPage> {
                     ),
                     SizedBox(height: 10),
                     TextField(
-                      controller: contentController,
+                      controller: descriptionController,
                       minLines: 5,
                       maxLines: 10,
                       decoration: InputDecoration(
+                        label: Text("Description"),
                         hint: Text("Description"),
                         border: OutlineInputBorder(
                           borderSide: BorderSide(
@@ -251,7 +281,6 @@ class _AddProjectPageState extends State<AddProjectPage> {
                           physics: NeverScrollableScrollPhysics(),
                           itemCount: tempTasks.length,
                           itemBuilder: (context, index) => ListTile(
-                            leading: Icon(Icons.circle_outlined, size: 30),
                             title: Text(tempTasks[index].task),
                             trailing: IconButton(
                               onPressed: () {

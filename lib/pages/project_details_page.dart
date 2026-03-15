@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:project_management_app/pages/add_project_page.dart';
+import 'package:project_management_app/providers/project_provider.dart';
+import 'package:provider/provider.dart';
 import '../model/project_model.dart';
 
 class ProjectDetailPage extends StatefulWidget {
@@ -14,10 +17,17 @@ class ProjectDetailPage extends StatefulWidget {
 class _ProjectDetailPageState extends State<ProjectDetailPage> {
   @override
   Widget build(BuildContext context) {
-    // Priority ke hisab se color set karna
-    Color priorityColor = widget.project.priority == 1
+    final project = context
+        .watch<ProjectProvider>()
+        .filteredProjects
+        .firstWhere(
+          (p) => p.id == widget.project.id,
+          orElse: () => widget.project,
+        );
+
+    Color priorityColor = project.priority == 1
         ? Colors.red
-        : widget.project.priority == 2
+        : project.priority == 2
         ? Colors.orange
         : Colors.green;
 
@@ -31,7 +41,15 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
           IconButton(
             icon: const Icon(Icons.edit_note),
             onPressed: () {
-              // Future mein yahan edit logic aayega
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) {
+                    // print(project.id);
+                    return AddProjectPage(project: project);
+                  },
+                ),
+              );
             },
           ),
         ],
@@ -41,7 +59,6 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // --- Project Info Card ---
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(20),
@@ -65,9 +82,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
-                          widget.project.priority == 1
-                              ? "High Priority"
-                              : "Normal",
+                          project.priority == 1 ? "High Priority" : "Normal",
                           style: TextStyle(
                             color: priorityColor,
                             fontWeight: FontWeight.bold,
@@ -76,14 +91,14 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                         ),
                       ),
                       Text(
-                        DateFormat('dd MMM').format(widget.project.createdAt),
+                        DateFormat('dd MMM').format(project.createdAt),
                         style: const TextStyle(color: Colors.grey),
                       ),
                     ],
                   ),
                   const SizedBox(height: 15),
                   Text(
-                    widget.project.title,
+                    project.title,
                     style: const TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
@@ -91,18 +106,18 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                   ),
                   const SizedBox(height: 10),
                   Text(
-                    widget.project.description,
+                    project.description,
                     style: const TextStyle(fontSize: 16, color: Colors.black54),
                   ),
                   const SizedBox(height: 20),
 
                   Text(
-                    "Overall Progress: ${widget.project.progress.toInt()}%",
+                    "Progress: ${project.progress.toInt()}%",
                     style: const TextStyle(fontWeight: FontWeight.w500),
                   ),
                   const SizedBox(height: 8),
                   LinearProgressIndicator(
-                    value: widget.project.progress / 100,
+                    value: project.progress / 100,
                     backgroundColor: Colors.grey[200],
                     color: Colors.deepPurple,
                     minHeight: 8,
@@ -120,14 +135,14 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
             ),
             const SizedBox(height: 15),
 
-            widget.project.tasks.isEmpty
+            project.tasks.isEmpty
                 ? const Center(child: Text("No tasks added yet"))
                 : ListView.builder(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
-                    itemCount: widget.project.tasks.length,
+                    itemCount: project.tasks.length,
                     itemBuilder: (context, index) {
-                      final task = widget.project.tasks[index];
+                      final task = project.tasks[index];
                       return Container(
                         margin: const EdgeInsets.only(bottom: 10),
                         decoration: BoxDecoration(
@@ -137,10 +152,21 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                         child: ListTile(
                           leading: Checkbox(
                             value: task.isCompleted,
-                            onChanged: (value) {
-                              setState(() {
-                                task.isCompleted = !task.isCompleted;
-                              });
+                            onChanged: (value) async {
+                              task.isCompleted = value ?? false;
+                              try {
+                                await context
+                                    .read<ProjectProvider>()
+                                    .updateProject(project);
+                              } catch (e) {
+                                setState(() {
+                                  task.isCompleted = !task.isCompleted;
+                                });
+
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text("Failed to sync: $e")),
+                                );
+                              }
                             },
                           ),
                           title: Text(

@@ -16,7 +16,7 @@ class ProjectsRepository {
           .orderBy('CreatedAt', descending: true)
           .orderBy('Priority', descending: true)
           .get();
-      print("Total Docs in Firestore: ${snapshot.docs.length}");
+      // print("Total Docs in Firestore: ${snapshot.docs.length}");
       return snapshot.docs
           .map((doc) => ProjectModel.fromJson(doc.data(), doc.id))
           .toList();
@@ -48,7 +48,13 @@ class ProjectsRepository {
           .doc(user!.uid)
           .collection('projects')
           .doc(project.id)
-          .set(project.toJson());
+          .update({
+            'Title': project.title,
+            'Description': project.description,
+            'Priority': project.priority,
+            'Status': project.status,
+            'Tasks': project.tasks.map((task) => task.toJson()).toList(),
+          });
     } catch (e) {
       throw Exception('Failed to update project: $e');
     }
